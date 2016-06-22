@@ -15,9 +15,9 @@ public class MCPatcherMod extends DummyModContainer
         meta.modId = "magneticraftpatcher";
         meta.name = "MagnetiCraft Patcher";
         meta.description = "Fixes the Shelving Unit item deletion bug";
-        meta.version = "0.1";
+        meta.version = "1.7.10-0.1";
         meta.authorList = Arrays.asList("Belgabor");
-        meta.credits = "VikeStep for his ASM transformer tutorial";
+        meta.credits = "cout970 & crew for MagnetiCraft, VikeStep for his ASM transformer tutorial, squeek502 for ASMHelper";
         
     }
     
