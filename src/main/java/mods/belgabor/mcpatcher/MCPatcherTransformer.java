@@ -69,13 +69,11 @@ public class MCPatcherTransformer implements IClassTransformer {
     }
 
     private byte[] transform(int index, byte[] classBeingTransformed) {
-        System.out.println("Transforming: " + classesBeingTransformed[index]);
-        try
-        {
+        MCPatcherLogger.info("Transforming: " + classesBeingTransformed[index]);
+        try {
             ClassNode classNode = ASMHelper.readClassFromBytes(classBeingTransformed);
 
-            switch(index)
-            {
+            switch(index) {
                 case 0:
                     transformInventoryComponent(classNode);
                     break;
@@ -95,14 +93,16 @@ public class MCPatcherTransformer implements IClassTransformer {
 
             return ASMHelper.writeClassToBytes(classNode, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         }
-        catch (Exception e)
-        {
+        catch (PatchFailed e) {
+            MCPatcherLogger.error("FAILED: " + e.getMessage());
+        }
+        catch (Exception e) {
             e.printStackTrace();
         }
         return classBeingTransformed;
     }
 
-    private void transformInventoryCrafterAuxContainer(ClassNode classNode) {
+    private void transformInventoryCrafterAuxContainer(ClassNode classNode) throws PatchFailed {
         final String CONSTRUCTOR = "<init>";
         final String CONSTRUCTOR_DESC = "()V";
         final String ON_CHANGED = ObfHelper.isObfuscated()?"func_75130_a":"onCraftMatrixChanged";
@@ -112,11 +112,11 @@ public class MCPatcherTransformer implements IClassTransformer {
         
         for (MethodNode method : classNode.methods) {
             if (method.name.equals(CONSTRUCTOR) && method.desc.equals(CONSTRUCTOR_DESC)) {
-                System.out.println("Found InventoryCrafterAux$1:<init>");
+                MCPatcherLogger.info("Found InventoryCrafterAux$1:<init>");
                 AbstractInsnNode targetNode = ASMHelper.findFirstInstructionWithOpcode(method, INVOKESPECIAL);
 
                 if (targetNode != null) {
-                    System.out.println("Patching InventoryCrafterAux$1:<init>");
+                    MCPatcherLogger.info("Patching InventoryCrafterAux$1:<init>");
                     doPatch = true;
                     method.desc = "(Lcom/cout970/magneticraft/tileentity/TileCrafter;)V";
                     method.visitMaxs(2, 2);
@@ -127,7 +127,8 @@ public class MCPatcherTransformer implements IClassTransformer {
                     toInsert.add(new VarInsnNode(ALOAD, 0));
                     
                     method.instructions.insertBefore(targetNode, toInsert);
-                }
+                } else
+                    throw new PatchFailed("InventoryCrafterAux$1:<init> - Instruction not found");
             }
         }
         
@@ -155,39 +156,47 @@ public class MCPatcherTransformer implements IClassTransformer {
             onCraftMatrixChanged.localVariables.add(new LocalVariableNode("p_75130_1_", ObfHelper.getDescriptor("net.minecraft.inventory.IInventory"), null, startLabel, endLabel, 1));
             
             classNode.methods.add(onCraftMatrixChanged);
-        }
+        } else
+            throw new PatchFailed("InventoryCrafterAux$1:<init> - Constructor not found");
     }
 
-    private void transformInventoryCrafterAux(ClassNode classNode) {
+    private void transformInventoryCrafterAux(ClassNode classNode) throws PatchFailed {
         final String CONSTRUCTOR = "<init>";
         final String CONSTRUCTOR_DESC = "(Lcom/cout970/magneticraft/tileentity/TileCrafter;II)V";
+        boolean patched = false;
         for (MethodNode method : classNode.methods) {
             if (method.name.equals(CONSTRUCTOR) && method.desc.equals(CONSTRUCTOR_DESC)) {
-                System.out.println("Found InventoryCrafterAux:<init>");
+                MCPatcherLogger.info("Found InventoryCrafterAux:<init>");
                 AbstractInsnNode targetNode = ASMHelper.findFirstInstructionWithOpcode(method, INVOKESPECIAL);
                 
                 if (targetNode != null && targetNode.getPrevious().getOpcode() == DUP) {
-                    System.out.println("Patching InventoryCrafterAux:<init>");
+                    MCPatcherLogger.info("Patching InventoryCrafterAux:<init>");
+                    patched = true;
                     method.instructions.insertBefore(targetNode, new VarInsnNode(ALOAD, 1));
 
                     MethodInsnNode writeNode = (MethodInsnNode) targetNode;
                     writeNode.desc = "(Lcom/cout970/magneticraft/tileentity/TileCrafter;)V";
-                }
+                } else
+                    throw new PatchFailed("InventoryCrafterAux:<init> - Instruction not found");
             }
         }
-
+        if (!patched)
+            throw new PatchFailed("InventoryCrafterAux:<init> - Constructor not found");
     }
 
-    private void transformTileShelfFiller(ClassNode classNode) {
+    private void transformTileShelfFiller(ClassNode classNode) throws PatchFailed {
         final String GET_MAIN_TILE = "getMainTile";
         final String GET_MAIN_TILE_DESC = "()Lcom/cout970/magneticraft/tileentity/shelf/TileShelvingUnit;";
         final String READ_NBT = ObfHelper.isObfuscated()?"func_145839_a":"readFromNBT";
         final String READ_NBT_DESC = "(Lnet/minecraft/nbt/NBTTagCompound;)V";
         final String WRITE_NBT = ObfHelper.isObfuscated()?"func_145841_b":"writeToNBT";
         final String WRITE_NBT_DESC = "(Lnet/minecraft/nbt/NBTTagCompound;)V";
+        int patches = 0;
+        
         for (MethodNode method : classNode.methods) {
             if (method.name.equals(GET_MAIN_TILE) && method.desc.equals(GET_MAIN_TILE_DESC)) {
-                System.out.println("Found/Patching TileShelfFiller:getMainTile");
+                MCPatcherLogger.info("Found/Patching TileShelfFiller:getMainTile");
+                patches++;
                 LabelNode newLabelNode = new LabelNode();
 
                 InsnList toInsert = new InsnList();
@@ -200,10 +209,11 @@ public class MCPatcherTransformer implements IClassTransformer {
 
                 method.instructions.insertBefore(method.instructions.getFirst(), toInsert);
             } else if (method.name.equals(WRITE_NBT) && method.desc.equals(WRITE_NBT_DESC)) {
-                System.out.println("Found TileShelfFiller:writeToNBT");
+                MCPatcherLogger.info("Found TileShelfFiller:writeToNBT");
                 AbstractInsnNode targetNode = ASMHelper.findFirstInstructionWithOpcode(method, INVOKESPECIAL);
                 if (targetNode != null) {
-                    System.out.println("Patching TileShelfFiller:writeToNBT");
+                    MCPatcherLogger.info("Patching TileShelfFiller:writeToNBT");
+                    patches++;
                     LabelNode newLabelNode = new LabelNode();
 
                     InsnList toInsert = new InsnList();
@@ -214,12 +224,14 @@ public class MCPatcherTransformer implements IClassTransformer {
                     toInsert.add(newLabelNode);
                     
                     method.instructions.insert(targetNode, toInsert);
-                }
+                } else
+                    throw new PatchFailed("TileShelfFiller:writeToNBT - Instruction not found");
             } else if (method.name.equals(READ_NBT) && method.desc.equals(READ_NBT_DESC)) {
-                System.out.println("Found TileShelfFiller:readFromNBT");
+                MCPatcherLogger.info("Found TileShelfFiller:readFromNBT");
                 AbstractInsnNode targetNode = ASMHelper.findFirstInstructionWithOpcode(method, INVOKESPECIAL);
                 if (targetNode != null) {
-                    System.out.println("Patching TileShelfFiller:readFromNBT");
+                    MCPatcherLogger.info("Patching TileShelfFiller:readFromNBT");
+                    patches++;
                     LabelNode newLabelNode = new LabelNode();
 
                     InsnList toInsert = new InsnList();
@@ -231,17 +243,22 @@ public class MCPatcherTransformer implements IClassTransformer {
                     toInsert.add(newLabelNode);
 
                     method.instructions.insert(targetNode, toInsert);
-                }
+                } else
+                    throw new PatchFailed("TileShelfFiller:readFromNBT - Instruction not found");
             }
         }
+        if (patches != 3)
+            throw new PatchFailed("TileShelfFiller - Some methods not found");
     }
 
-    private void transformTileShelf(ClassNode classNode) {
+    private void transformTileShelf(ClassNode classNode) throws PatchFailed {
         final String GET_INVENTORY = "getInventory";
         final String GET_INVENTORY_DESC = "()Lcom/cout970/magneticraft/util/InventoryResizable;";
+        boolean patched = false;
         for (MethodNode method : classNode.methods) {
             if (method.name.equals(GET_INVENTORY) && method.desc.equals(GET_INVENTORY_DESC)) {
-                System.out.println("Found/Patching TileShelf:getInventory");
+                MCPatcherLogger.info("Found/Patching TileShelf:getInventory");
+                patched = true;
                 LabelNode newLabelNode = new LabelNode();
                 
                 InsnList toInsert = new InsnList();
@@ -254,17 +271,20 @@ public class MCPatcherTransformer implements IClassTransformer {
                 
                 method.instructions.insertBefore(method.instructions.getFirst(), toInsert);
             }
-        }        
+        }
+        if (!patched)
+            throw new PatchFailed("TileShelf:getInventory - Method not found");
     }
 
-    private void transformInventoryComponent(ClassNode classNode) {
+    private void transformInventoryComponent(ClassNode classNode) throws PatchFailed {
         final String READ_NBT = "readFromNBT";
         final String READ_NBT_DESC = "(Lnet/minecraft/nbt/NBTTagCompound;Ljava/lang/String;)V";
         final String WRITE_NBT = "writeToNBT";
         final String WRITE_NBT_DESC = "(Lnet/minecraft/nbt/NBTTagCompound;Ljava/lang/String;)V";
+        int patches = 0;
         for (MethodNode method : classNode.methods) {
             if (method.name.equals(READ_NBT) && method.desc.equals(READ_NBT_DESC)) {
-                System.out.println("Found InventoryComponent:readFromNBT");
+                MCPatcherLogger.info("Found InventoryComponent:readFromNBT");
                 final AbstractInsnNode queryNode = new MethodInsnNode(INVOKEVIRTUAL, "net/minecraft/nbt/NBTTagCompound", ObfHelper.isObfuscated()?"func_74771_c":"getByte", "(Ljava/lang/String;)B", false);
                 AbstractInsnNode targetNode = null;
                 for (AbstractInsnNode instruction : method.instructions.toArray()) {
@@ -274,23 +294,28 @@ public class MCPatcherTransformer implements IClassTransformer {
                     }
                 }
                 if (targetNode != null) {
-                    System.out.println("Patching InventoryComponent:readFromNBT");
+                    MCPatcherLogger.info("Patching InventoryComponent:readFromNBT");
+                    patches++;
                     MethodInsnNode writeNode = (MethodInsnNode) targetNode;
                     writeNode.name = ObfHelper.isObfuscated()?"func_74762_e":"getInteger";
                     writeNode.desc = "(Ljava/lang/String;)I";
-                }
-                
+                } else
+                    throw new PatchFailed("InventoryComponent:readFromNBT - Instruction not found");
             } else if (method.name.equals(WRITE_NBT) && method.desc.equals(WRITE_NBT_DESC)) {
-                System.out.println("Found InventoryComponent:writeToNBT");
+                MCPatcherLogger.info("Found InventoryComponent:writeToNBT");
                 AbstractInsnNode targetNode = ASMHelper.findFirstInstructionWithOpcode(method, I2B);
                 if (targetNode != null && targetNode.getPrevious().getOpcode() == ILOAD && targetNode.getNext().getOpcode() == INVOKEVIRTUAL) {
-                    System.out.println("Patching InventoryComponent:writeToNBT");
+                    MCPatcherLogger.info("Patching InventoryComponent:writeToNBT");
+                    patches++;
                     MethodInsnNode writeNode = (MethodInsnNode) targetNode.getNext();
                     method.instructions.remove(targetNode);
                     writeNode.name = ObfHelper.isObfuscated()?"func_74768_a":"setInteger";
                     writeNode.desc = "(Ljava/lang/String;I)V";
-                }
+                } else
+                    throw new PatchFailed("InventoryComponent:writeToNBT - Instruction not found");
             }
         }
+        if (patches != 2)
+            throw new PatchFailed("InventoryComponent - Some methods not found");
     }
 }
