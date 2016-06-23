@@ -3,6 +3,7 @@ package mods.belgabor.mcpatcher;
 import net.minecraft.launchwrapper.IClassTransformer;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.tree.*;
 import org.objectweb.asm.util.ASMifier;
 import org.objectweb.asm.util.Textifier;
@@ -27,8 +28,11 @@ public class MCPatcherTransformer implements IClassTransformer {
             "com.cout970.magneticraft.tileentity.shelf.TileShelf",
             "com.cout970.magneticraft.tileentity.shelf.TileShelfFiller",
             "com.cout970.magneticraft.util.InventoryCrafterAux",
-            "com.cout970.magneticraft.util.InventoryCrafterAux$1"
+            "com.cout970.magneticraft.util.InventoryCrafterAux$1",
+            "com.cout970.magneticraft.tileentity.TileCrafter"
     };
+    private static int patchedClasses = 0;
+    private static boolean checkAll = true;
     private static final boolean debug = false;
     private static final boolean debugNoPatch = false;
     private static final File dumpDir = new File("dumps/");
@@ -89,6 +93,15 @@ public class MCPatcherTransformer implements IClassTransformer {
                 case 4:
                     transformInventoryCrafterAuxContainer(classNode);
                     break;
+                case 5:
+                    transformTileCrafter(classNode);
+                    break;
+            }
+            
+            patchedClasses++;
+            if (checkAll && patchedClasses == classesBeingTransformed.length) {
+                checkAll = false;
+                MCPatcherLogger.info("All patches successfully applied.");
             }
 
             return ASMHelper.writeClassToBytes(classNode, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
@@ -100,6 +113,41 @@ public class MCPatcherTransformer implements IClassTransformer {
             e.printStackTrace();
         }
         return classBeingTransformed;
+    }
+
+    private void transformTileCrafter(ClassNode classNode) throws PatchFailed {
+        final String REPLACE_MATRIX = "replaceMatrix";
+        final String REPLACE_MATRIX_DESC = ObfHelper.desc("(Lnet/minecraft/inventory/InventoryCrafting;Lnet/minecraft/item/ItemStack;Lnet/minecraft/item/ItemStack;I)Z");
+        
+        MethodNode mv = ASMHelper.findMethodNodeOfClass(classNode, REPLACE_MATRIX, REPLACE_MATRIX_DESC);
+        if (mv != null) {
+            MCPatcherLogger.info("Found/Patching TileCrafter:replaceMatrix");
+            mv.instructions.clear();
+            mv.localVariables.clear();
+            
+            Label labelStart = new Label();
+            mv.visitLabel(labelStart);
+            mv.visitLineNumber(253, labelStart);
+            mv.visitVarInsn(ALOAD, 0);
+            mv.visitFieldInsn(GETFIELD, "com/cout970/magneticraft/tileentity/TileCrafter", "craftRecipe", "Lnet/minecraft/item/crafting/IRecipe;");
+            mv.visitVarInsn(ALOAD, 0);
+            mv.visitFieldInsn(GETFIELD, "com/cout970/magneticraft/tileentity/TileCrafter", ObfHelper.isObfuscated()?"field_145850_b":"worldObj", "Lnet/minecraft/world/World;");
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitVarInsn(ALOAD, 3);
+            mv.visitVarInsn(ILOAD, 4);
+            mv.visitMethodInsn(INVOKESTATIC, ASMHelper.toInternalClassName(MCPatcherHooks.class.getName()), "crafterReplaceMatrix", "(Lnet/minecraft/item/crafting/IRecipe;Lnet/minecraft/world/World;Lnet/minecraft/inventory/InventoryCrafting;Lnet/minecraft/item/ItemStack;Lnet/minecraft/item/ItemStack;I)Z", false);
+            mv.visitInsn(IRETURN);
+            Label labelEnd = new Label();
+            mv.visitLabel(labelEnd);
+            mv.visitLocalVariable("this", "Lcom/cout970/magneticraft/tileentity/TileCrafter;", null, labelStart, labelEnd, 0);
+            mv.visitLocalVariable("craft", ObfHelper.getDescriptor("net.minecraft.inventory.InventoryCrafting"), null, labelStart, labelEnd, 1);
+            mv.visitLocalVariable("result", ObfHelper.getDescriptor("net.minecraft.item.ItemStack"), null, labelStart, labelEnd, 2);
+            mv.visitLocalVariable("stack", ObfHelper.getDescriptor("net.minecraft.item.ItemStack"), null, labelStart, labelEnd, 3);
+            mv.visitLocalVariable("slot", "I", null, labelStart, labelEnd, 4);
+            mv.visitMaxs(6, 5);
+        } else
+            throw new PatchFailed("TileCrafter:replaceMatrix - Method not found");
     }
 
     private void transformInventoryCrafterAuxContainer(ClassNode classNode) throws PatchFailed {
@@ -237,7 +285,7 @@ public class MCPatcherTransformer implements IClassTransformer {
                     InsnList toInsert = new InsnList();
                     toInsert.add(new VarInsnNode(ALOAD, 1));
                     toInsert.add(new LdcInsnNode("offsetX"));
-                    toInsert.add(new MethodInsnNode(INVOKEVIRTUAL, "net/minecraft/nbt/NBTTagCompound", ObfHelper.isObfuscated()?"func_74764_b":"hasKey", "(Ljava/lang/String;)Z", false));
+                    toInsert.add(new MethodInsnNode(INVOKEVIRTUAL, ObfHelper.getInternalClassName("net.minecraft.nbt.NBTTagCompound"), ObfHelper.isObfuscated()?"func_74764_b":"hasKey", "(Ljava/lang/String;)Z", false));
                     toInsert.add(new JumpInsnNode(IFNE, newLabelNode));
                     toInsert.add(new InsnNode(RETURN));
                     toInsert.add(newLabelNode);
@@ -285,7 +333,7 @@ public class MCPatcherTransformer implements IClassTransformer {
         for (MethodNode method : classNode.methods) {
             if (method.name.equals(READ_NBT) && method.desc.equals(READ_NBT_DESC)) {
                 MCPatcherLogger.info("Found InventoryComponent:readFromNBT");
-                final AbstractInsnNode queryNode = new MethodInsnNode(INVOKEVIRTUAL, "net/minecraft/nbt/NBTTagCompound", ObfHelper.isObfuscated()?"func_74771_c":"getByte", "(Ljava/lang/String;)B", false);
+                final AbstractInsnNode queryNode = new MethodInsnNode(INVOKEVIRTUAL, ObfHelper.getInternalClassName("net.minecraft.nbt.NBTTagCompound"), ObfHelper.isObfuscated()?"func_74771_c":"getByte", "(Ljava/lang/String;)B", false);
                 AbstractInsnNode targetNode = null;
                 for (AbstractInsnNode instruction : method.instructions.toArray()) {
                     if (ASMHelper.instructionsMatch(instruction, queryNode)) {
