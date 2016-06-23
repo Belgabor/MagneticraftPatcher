@@ -14,4 +14,4 @@ Issues addressed:
 * Fixes cout970/Magneticraft-API-and-Issues#84 (shelving unit deleting items)
 * Should fix cout970/Magneticraft-API-and-Issues#77 / cout970/Magneticraft-API-and-Issues#82 (pipe interacion)
 * Maybe fixes cout970/Magneticraft-API-and-Issues#92 (strange SMP crash)
-* Should fix cout970/Magneticraft-API-and-Issues#80 (crafter dupe)
+* Should fix cout970/Magneticraft-API-and-Issues#80 (crafter dupe) (Version 0.2)
