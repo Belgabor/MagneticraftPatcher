@@ -1,5 +1,6 @@
 package mods.belgabor.mcpatcher;
 
+import mods.belgabor.mcpatcher.upgrades.SlotUpgrade;
 import net.minecraft.launchwrapper.IClassTransformer;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
@@ -8,6 +9,7 @@ import org.objectweb.asm.tree.*;
 import org.objectweb.asm.util.ASMifier;
 import org.objectweb.asm.util.Textifier;
 import org.objectweb.asm.util.TraceClassVisitor;
+import mods.belgabor.mcpatcher.upgrades.ItemUpgrade;
 import squeek.asmhelper.com.belgabor.mcpatcher.ASMHelper;
 import squeek.asmhelper.com.belgabor.mcpatcher.ObfHelper;
 
@@ -29,7 +31,9 @@ public class MCPatcherTransformer implements IClassTransformer {
             "com.cout970.magneticraft.tileentity.shelf.TileShelfFiller",
             "com.cout970.magneticraft.util.InventoryCrafterAux",
             "com.cout970.magneticraft.util.InventoryCrafterAux$1",
-            "com.cout970.magneticraft.tileentity.TileCrafter"
+            "com.cout970.magneticraft.tileentity.TileCrafter",
+            "com.cout970.magneticraft.ManagerItems",
+            "com.cout970.magneticraft.container.ContainerInserter"
     };
     private static int patchedClasses = 0;
     private static boolean checkAll = true;
@@ -40,7 +44,7 @@ public class MCPatcherTransformer implements IClassTransformer {
     private static final String[] dumpClasses = {
     };
     
-    {
+    static {
         if (debug) {
             if (!dumpDir.exists()) {
                 //noinspection ResultOfMethodCallIgnored
@@ -96,6 +100,12 @@ public class MCPatcherTransformer implements IClassTransformer {
                 case 5:
                     transformTileCrafter(classNode);
                     break;
+                case 6:
+                    transformManagerItems(classNode);
+                    break;
+                case 7:
+                    transformContainerInserter(classNode);
+                    break;
             }
             
             patchedClasses++;
@@ -113,6 +123,93 @@ public class MCPatcherTransformer implements IClassTransformer {
             e.printStackTrace();
         }
         return classBeingTransformed;
+    }
+
+    private void transformContainerInserter(ClassNode classNode) throws PatchFailed {
+        final String CONSTRUCTOR = "<init>";
+        final String CONSTRUCTOR_DESC = ObfHelper.desc("(Lnet/minecraft/entity/player/InventoryPlayer;Lnet/minecraft/tileentity/TileEntity;)V");
+        final String SLOT_UPGRADE = ASMHelper.toInternalClassName(SlotUpgrade.class.getName());
+        int patches = 0;
+
+        MethodNode mv = ASMHelper.findMethodNodeOfClass(classNode, CONSTRUCTOR, CONSTRUCTOR_DESC);
+        if (mv != null) {
+            MCPatcherLogger.info("Found ContainerInserter:<init>");
+            AbstractInsnNode queryNode = new TypeInsnNode(NEW, ObfHelper.getInternalClassName("net.minecraft.inventory.Slot"));
+            AbstractInsnNode targetNode = null;
+            boolean skip = true;
+            for (AbstractInsnNode instruction : mv.instructions.toArray()) {
+                if (ASMHelper.instructionsMatch(instruction, queryNode)) {
+                    if (skip) {
+                        skip = false;
+                        continue;
+                    }
+                    targetNode = instruction;
+                    break;
+                }
+            }
+            if (targetNode != null) {
+                MCPatcherLogger.info("Patching ContainerInserter:<init>");
+                targetNode = targetNode.getPrevious();
+                
+                for (int i = 0; i < 4; i++) {
+                    targetNode = ASMHelper.findNextInstructionWithOpcode(targetNode, NEW);
+                    if (targetNode != null) {
+                        ((TypeInsnNode) targetNode).desc = SLOT_UPGRADE;
+                        patches++;
+                    } else
+                        throw new PatchFailed(String.format("ContainerInserter:<init> - Instruction not found (%d)", patches));
+                    targetNode = ASMHelper.findNextInstructionWithOpcode(targetNode, INVOKESPECIAL);
+                    if (targetNode != null) {
+                        ((MethodInsnNode) targetNode).owner = SLOT_UPGRADE;
+                        patches++;
+                    } else
+                        throw new PatchFailed(String.format("ContainerInserter:<init> - Instruction not found (%d)", patches));
+                }
+
+            } else
+                throw new PatchFailed("ContainerInserter:<init> - Instruction not found");
+
+        }
+    }
+
+    private void transformManagerItems(ClassNode classNode) throws PatchFailed {
+        final String INIT_ITEMS = "initItems";
+        final String INIT_ITEMS_DESC = "()V";
+        final String ITEM_UPGRADE = ASMHelper.toInternalClassName(ItemUpgrade.class.getName());
+        int patches = 0;
+        MethodNode mv = ASMHelper.findMethodNodeOfClass(classNode, INIT_ITEMS, INIT_ITEMS_DESC);
+        if (mv != null) {
+            MCPatcherLogger.info("Found ManagerItems:initItems");
+            final AbstractInsnNode queryNode = new FieldInsnNode(PUTSTATIC, "com/cout970/magneticraft/ManagerItems", "magnet", "Lnet/minecraft/item/Item;");
+            AbstractInsnNode targetNode = null;
+            for (AbstractInsnNode instruction : mv.instructions.toArray()) {
+                if (ASMHelper.instructionsMatch(instruction, queryNode)) {
+                    targetNode = instruction;
+                    break;
+                }
+            }
+            if (targetNode != null) {
+                MCPatcherLogger.info("Patching ManagerItems:initItems");
+                targetNode = targetNode.getNext().getNext().getNext();
+                for (int i = 0; i < 4; i++) {
+                    if (targetNode instanceof TypeInsnNode) {
+                        ((TypeInsnNode) targetNode).desc = ITEM_UPGRADE;
+                        patches++;
+                    } else
+                        throw new PatchFailed(String.format("ManagerItems:initItems - Instruction not found (%d)", patches));
+                    targetNode = targetNode.getNext().getNext().getNext();
+                    if (targetNode instanceof MethodInsnNode) {
+                        ((MethodInsnNode) targetNode).owner = ITEM_UPGRADE;
+                        patches++;
+                    } else
+                        throw new PatchFailed(String.format("ManagerItems:initItems - Instruction not found (%d)", patches));
+                    targetNode = targetNode.getNext().getNext().getNext().getNext();
+                }
+                    
+            } else
+                throw new PatchFailed("ManagerItems:initItems - Instruction not found");
+            
+        }
     }
 
     private void transformTileCrafter(ClassNode classNode) throws PatchFailed {
