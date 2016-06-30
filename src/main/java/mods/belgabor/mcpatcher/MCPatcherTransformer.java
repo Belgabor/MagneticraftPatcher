@@ -33,8 +33,10 @@ public class MCPatcherTransformer implements IClassTransformer {
             "com.cout970.magneticraft.util.InventoryCrafterAux$1",
             "com.cout970.magneticraft.tileentity.TileCrafter",
             "com.cout970.magneticraft.ManagerItems",
-            "com.cout970.magneticraft.container.ContainerInserter"
+            "com.cout970.magneticraft.container.ContainerInserter",
+            "com.cout970.magneticraft.tileentity.TileInserter"
     };
+    private static String HOOKS = ASMHelper.toInternalClassName(MCPatcherHooks.class.getName());
     private static int patchedClasses = 0;
     private static boolean checkAll = true;
     private static final boolean debug = false;
@@ -106,6 +108,9 @@ public class MCPatcherTransformer implements IClassTransformer {
                 case 7:
                     transformContainerInserter(classNode);
                     break;
+                case 8:
+                    transformTileInserter(classNode);
+                    break;
             }
             
             patchedClasses++;
@@ -123,6 +128,87 @@ public class MCPatcherTransformer implements IClassTransformer {
             e.printStackTrace();
         }
         return classBeingTransformed;
+    }
+
+    private void transformTileInserter(ClassNode classNode) throws PatchFailed {
+        final String DROP_TO_INV = "dropToInv";
+        final String DROP_TO_INV_DESC = ObfHelper.desc("(Lnet/minecraft/inventory/IInventory;)V");
+        final String SUCK_FROM_INV = "suckFromInv";
+        final String SUCK_FROM_INV_DESC = ObfHelper.desc("(Lnet/minecraft/inventory/IInventory;Ljava/lang/Object;)V");
+        final String CAN_INJECT = "canInject";
+        final String CAN_INJECT_DESC = ObfHelper.desc("(Ljava/lang/Object;Lnet/minecraft/item/ItemStack;)Z");
+        MethodNode mv = ASMHelper.findMethodNodeOfClass(classNode, DROP_TO_INV, DROP_TO_INV_DESC);
+        if (mv != null) {
+            MCPatcherLogger.info("Found TileInserter:dropToInv");
+            AbstractInsnNode queryNode = new MethodInsnNode(INVOKEVIRTUAL, "com/cout970/magneticraft/tileentity/TileInserter", "getDir", "()Lcom/cout970/magneticraft/api/util/MgDirection;", false);
+            AbstractInsnNode targetNode = null;
+            for (AbstractInsnNode instruction : mv.instructions.toArray()) {
+                if (ASMHelper.instructionsMatch(instruction, queryNode)) {
+                    targetNode = instruction;
+                    break;
+                }
+            }
+            if (targetNode != null) {
+                MCPatcherLogger.info("Patching TileInserter:dropToInv");
+                mv.instructions.insertBefore(targetNode, new InsnNode(ICONST_0));
+                MethodInsnNode writeNode = (MethodInsnNode) targetNode;
+                writeNode.setOpcode(INVOKESTATIC);
+                writeNode.owner = HOOKS;
+                writeNode.name = "inserterGetAccessSide";
+                writeNode.desc = "(Lcom/cout970/magneticraft/tileentity/TileInserter;Z)Lcom/cout970/magneticraft/api/util/MgDirection;";
+            } else
+                throw new PatchFailed("TileInserter:dropToInv - Instruction not found");
+        } else
+            throw new PatchFailed("TileInserter:dropToInv - Method not found");
+        
+        mv = ASMHelper.findMethodNodeOfClass(classNode, SUCK_FROM_INV, SUCK_FROM_INV_DESC);
+        if (mv != null) {
+            MCPatcherLogger.info("Found TileInserter:suckFromInv");
+            AbstractInsnNode queryNode = new MethodInsnNode(INVOKEVIRTUAL, "com/cout970/magneticraft/tileentity/TileInserter", "getDir", "()Lcom/cout970/magneticraft/api/util/MgDirection;", false);
+            AbstractInsnNode targetNode = null;
+            for (AbstractInsnNode instruction : mv.instructions.toArray()) {
+                if (ASMHelper.instructionsMatch(instruction, queryNode)) {
+                    targetNode = instruction;
+                    break;
+                }
+            }
+            if (targetNode != null) {
+                MCPatcherLogger.info("Patching TileInserter:suckFromInv");
+                MethodInsnNode writeNode = (MethodInsnNode) targetNode.getNext();
+                mv.instructions.remove(targetNode);
+                mv.instructions.insertBefore(writeNode, new InsnNode(ICONST_1));
+                writeNode.setOpcode(INVOKESTATIC);
+                writeNode.owner = HOOKS;
+                writeNode.name = "inserterGetAccessSide";
+                writeNode.desc = "(Lcom/cout970/magneticraft/tileentity/TileInserter;Z)Lcom/cout970/magneticraft/api/util/MgDirection;";
+            } else
+                throw new PatchFailed("TileInserter:suckFromInv - Instruction not found");
+        } else
+            throw new PatchFailed("TileInserter:suckFromInv - Method not found");
+        
+        mv = ASMHelper.findMethodNodeOfClass(classNode, CAN_INJECT, CAN_INJECT_DESC);
+        if (mv != null) {
+            MCPatcherLogger.info("Found TileInserter:canInject");
+            AbstractInsnNode queryNode = new MethodInsnNode(INVOKEVIRTUAL, "com/cout970/magneticraft/tileentity/TileInserter", "getDir", "()Lcom/cout970/magneticraft/api/util/MgDirection;", false);
+            AbstractInsnNode targetNode = null;
+            for (AbstractInsnNode instruction : mv.instructions.toArray()) {
+                if (ASMHelper.instructionsMatch(instruction, queryNode)) {
+                    targetNode = instruction;
+                    break;
+                }
+            }
+            if (targetNode != null) {
+                MCPatcherLogger.info("Patching TileInserter:canInject");
+                mv.instructions.insertBefore(targetNode, new InsnNode(ICONST_0));
+                MethodInsnNode writeNode = (MethodInsnNode) targetNode;
+                writeNode.setOpcode(INVOKESTATIC);
+                writeNode.owner = HOOKS;
+                writeNode.name = "inserterGetAccessSide";
+                writeNode.desc = "(Lcom/cout970/magneticraft/tileentity/TileInserter;Z)Lcom/cout970/magneticraft/api/util/MgDirection;";
+            } else
+                throw new PatchFailed("TileInserter:canInject - Instruction not found");
+        } else
+            throw new PatchFailed("TileInserter:canInject - Method not found");
     }
 
     private void transformContainerInserter(ClassNode classNode) throws PatchFailed {
@@ -168,8 +254,8 @@ public class MCPatcherTransformer implements IClassTransformer {
 
             } else
                 throw new PatchFailed("ContainerInserter:<init> - Instruction not found");
-
-        }
+        } else
+            throw new PatchFailed("ContainerInserter:<init> - Constructor not found");
     }
 
     private void transformManagerItems(ClassNode classNode) throws PatchFailed {
@@ -208,8 +294,9 @@ public class MCPatcherTransformer implements IClassTransformer {
                     
             } else
                 throw new PatchFailed("ManagerItems:initItems - Instruction not found");
-            
-        }
+
+        } else
+            throw new PatchFailed("ManagerItems:initItems - Method not found");
     }
 
     private void transformTileCrafter(ClassNode classNode) throws PatchFailed {
@@ -233,7 +320,7 @@ public class MCPatcherTransformer implements IClassTransformer {
             mv.visitVarInsn(ALOAD, 2);
             mv.visitVarInsn(ALOAD, 3);
             mv.visitVarInsn(ILOAD, 4);
-            mv.visitMethodInsn(INVOKESTATIC, ASMHelper.toInternalClassName(MCPatcherHooks.class.getName()), "crafterReplaceMatrix", "(Lnet/minecraft/item/crafting/IRecipe;Lnet/minecraft/world/World;Lnet/minecraft/inventory/InventoryCrafting;Lnet/minecraft/item/ItemStack;Lnet/minecraft/item/ItemStack;I)Z", false);
+            mv.visitMethodInsn(INVOKESTATIC, HOOKS, "crafterReplaceMatrix", "(Lnet/minecraft/item/crafting/IRecipe;Lnet/minecraft/world/World;Lnet/minecraft/inventory/InventoryCrafting;Lnet/minecraft/item/ItemStack;Lnet/minecraft/item/ItemStack;I)Z", false);
             mv.visitInsn(IRETURN);
             Label labelEnd = new Label();
             mv.visitLabel(labelEnd);

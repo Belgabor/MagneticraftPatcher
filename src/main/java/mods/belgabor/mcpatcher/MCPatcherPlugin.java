@@ -20,7 +20,7 @@ public class MCPatcherPlugin implements IFMLLoadingPlugin {
 
     @Override
     public String getModContainerClass() {
-        return MCPatcherMod.class.getName();
+        return MCPatcherASMMod.class.getName();
     }
 
     @Override

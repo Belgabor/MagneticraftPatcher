@@ -1,5 +1,8 @@
 package mods.belgabor.mcpatcher;
 
+import com.cout970.magneticraft.api.util.MgDirection;
+import com.cout970.magneticraft.tileentity.TileInserter;
+import mods.belgabor.mcpatcher.upgrades.ItemSneakyUpgrade;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.Container;
 import net.minecraft.inventory.InventoryCrafting;
@@ -30,5 +33,17 @@ public class MCPatcherHooks {
             ret = OreDictionary.itemMatches(result, newResult, true);
         }
         return ret;
+    }
+    
+    public static MgDirection inserterGetAccessSide(TileInserter inserter, boolean from) {
+        for (int l = 0; l < inserter.upgrades.getSizeInventory(); l++) {
+            ItemStack stack = inserter.upgrades.getStackInSlot(l);
+            if (stack != null && stack.getItem() instanceof ItemSneakyUpgrade) {
+                ItemSneakyUpgrade item = (ItemSneakyUpgrade) stack.getItem();
+                if (item.isFrom(stack) == from)
+                    return item.getDirection(stack);
+            }
+        }
+        return from?inserter.getDir().opposite():inserter.getDir();
     }
 }

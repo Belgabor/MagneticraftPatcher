@@ -6,5 +6,5 @@ package mods.belgabor.mcpatcher;
 public class MCPatcherConstants {
     public static final String MOD_ID = "magneticraftpatcher";
     public static final String MOD_NAME = "MagnetiCraft Patcher";
-    public static final String MOD_VERSION = "1.7.10-0.2";
+    public static final String MOD_VERSION = "1.7.10-0.3";
 }

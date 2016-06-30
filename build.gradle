@@ -17,7 +17,7 @@ buildscript {
 
 apply plugin: 'forge'
 
-version = "1.7.10-0.2"
+version = "1.7.10-0.3"
 group= "com.belgabor.mcpatcher" // http://maven.apache.org/guides/mini/guide-naming-conventions.html
 archivesBaseName = "MagneticraftPatcher"
 
@@ -32,7 +32,7 @@ minecraft {
 jar {
     manifest {
         attributes 'FMLCorePlugin': 'mods.belgabor.mcpatcher.MCPatcherPlugin'
-        attributes 'FMLCorePluginContainsMod': 'true'
+        attributes 'FMLCorePluginContainsFMLMod': 'true'
     }
 }
 
@@ -71,3 +71,5 @@ processResources
         exclude 'mcmod.info'
     }
 }
+apply plugin: 'idea'
+idea.module.inheritOutputDirs = true

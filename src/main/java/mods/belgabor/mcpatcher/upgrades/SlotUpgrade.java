@@ -14,6 +14,11 @@ public class SlotUpgrade extends Slot {
 
     @Override
     public boolean isItemValid(ItemStack itemStack) {
-        return (itemStack != null) && (itemStack.getItem() != null) && (itemStack.getItem() instanceof ItemUpgrade);
+        return (itemStack != null) && (itemStack.getItem() instanceof ItemUpgrade);
+    }
+
+    @Override
+    public int getSlotStackLimit() {
+        return 1;
     }
 }

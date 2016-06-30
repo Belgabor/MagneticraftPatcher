@@ -1,0 +1,16 @@
+[
+{
+  "modid": "magneticraftpatcher",
+  "name": "MagnetiCraft Patcher",
+  "description": "Fixes the Shelving Unit item deletion bug",
+  "version": "${version}",
+  "mcversion": "${mcversion}",
+  "url": "",
+  "updateUrl": "",
+  "authorList": ["Belgabor"],
+  "credits": "cout970 & crew for MagnetiCraft, VikeStep for his ASM transformer tutorial, squeek502 for ASMHelper",
+  "logoFile": "",
+  "screenshots": [],
+  "dependencies": ["magneticraft"]
+}
+]
